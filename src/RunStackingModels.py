@@ -1,9 +1,9 @@
 """
-Train, evaluate, and plot Stacking Ensemble (RF + XGBoost) on energy dataset
+Stacking models RF and XGBoost 
 - Same time-based split
 - Same features
-- Meta-model: Ridge Regression trained on out-of-fold predictions (cv=5)
 - Same evaluation + plots
+- Aggregate model: Ridge Regression trained on out-of-fold predictions (cv=5)
 """
 import pandas as pd
 import numpy as np
@@ -14,6 +14,7 @@ from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_squared_error, r2_score
 from xgboost import XGBRegressor
 import seaborn as sns
+from sklearn.linear_model import RidgeCV
 
 # Paths and config
 DATA_PATH = "Data/owid-energy-data-clean.csv"
@@ -45,7 +46,7 @@ X_test  = test[feature_cols]
 y_train = np.log1p(train["energy_per_capita"])
 y_test  = np.log1p(test["energy_per_capita"])
 
-# Base models — same hyperparameters as individual scripts
+# Base models: same parameters as individual scripts
 base_models = [
     ("random_forest", RandomForestRegressor(
         n_estimators=200,
@@ -65,15 +66,15 @@ base_models = [
     )),
 ]
 
-# Meta-model: Ridge trained on out-of-fold base model predictions
-# cv=5 ensures base model predictions are never made on data they were trained on
-meta_model = Ridge(alpha=10.0)
+# Aggregate model: Ridge trained on out-of-fold base model predictions
+# Out-of-fold predictions train model with data split into 5 chunks with 5 iterations
+aggregate_model = Ridge(alpha=10.0)
 
 model = StackingRegressor(
     estimators=base_models,
-    final_estimator=meta_model,
+    final_estimator=aggregate_model,
     cv=5,
-    passthrough=False,  # set True to also pass raw features to the meta-model
+    passthrough=False,
     n_jobs=-1
 )
 

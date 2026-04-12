@@ -1,25 +1,24 @@
 """
-Train, evaluate, and plot Stacking Ensemble (RF + XGBoost) on energy dataset
-- Same time-based split
-- Same features
-- Meta-model: Ridge Regression trained on out-of-fold predictions (cv=5)
-- Same evaluation + plots
+Train, evaluate, and plot Ridge Regression on energy dataset
+- Time-based train/test split (1965–2012 train, 2013–2024 test)
+- Trains Ridge Regression with cross-validated alpha selection
+- Evaluates RMSE and R²
+- Plots Actual vs Predicted and Residuals
 """
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-from sklearn.ensemble import RandomForestRegressor, StackingRegressor
-from sklearn.linear_model import Ridge
+from sklearn.linear_model import Ridge, RidgeCV
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, r2_score
-from xgboost import XGBRegressor
 import seaborn as sns
 
 # Paths and config
 DATA_PATH = "Data/owid-energy-data-clean.csv"
 OUTPUT_PATH = "results/"
 FIG_PATH = "figures/"
-MODEL_NAME = "stacking"
+MODEL_NAME = "ridge_regression"
 
 os.makedirs(OUTPUT_PATH, exist_ok=True)
 os.makedirs(FIG_PATH, exist_ok=True)
@@ -28,9 +27,7 @@ os.makedirs(FIG_PATH, exist_ok=True)
 df = pd.read_csv(DATA_PATH)
 df = df.sort_values(["country", "year"])
 
-# Time-based train/test split
-train = df[df["year"] <= 2012]
-test  = df[df["year"] > 2012]
+
 
 feature_cols = [
     "year", "log_population", "log_gdp_per_capita",
@@ -40,47 +37,36 @@ feature_cols = [
     "nuclear_share_energy",
 ]
 
+cols_needed = feature_cols + ["energy_per_capita"]
+df = df.dropna(subset=cols_needed)
+
+# Time-based train/test split (80/20)
+train = df[df["year"] <= 2012]
+test  = df[df["year"] > 2012]
+
 X_train = train[feature_cols]
 X_test  = test[feature_cols]
 y_train = np.log1p(train["energy_per_capita"])
 y_test  = np.log1p(test["energy_per_capita"])
 
-# Base models — same hyperparameters as individual scripts
-base_models = [
-    ("random_forest", RandomForestRegressor(
-        n_estimators=200,
-        max_depth=None,
-        min_samples_leaf=1,
-        random_state=42,
-        n_jobs=-1
-    )),
-    ("xgboost", XGBRegressor(
-        n_estimators=500,
-        max_depth=6,
-        learning_rate=0.05,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        random_state=42,
-        n_jobs=-1
-    )),
-]
+# Scale features — required for Ridge so the penalty treats all features equally
+scaler = StandardScaler()
+X_train_s = scaler.fit_transform(X_train)  # fit only on train
+X_test_s  = scaler.transform(X_test)
 
-# Meta-model: Ridge trained on out-of-fold base model predictions
-# cv=5 ensures base model predictions are never made on data they were trained on
-meta_model = Ridge(alpha=10.0)
+# Select best alpha via 5-fold cross-validation on the training set
+alphas = np.logspace(-3, 5, 200)
+ridge_cv = RidgeCV(alphas=alphas, cv=5)
+ridge_cv.fit(X_train_s, y_train)
+best_alpha = ridge_cv.alpha_
+print(f"Best alpha (CV): {best_alpha:.4f}")
 
-model = StackingRegressor(
-    estimators=base_models,
-    final_estimator=meta_model,
-    cv=5,
-    passthrough=False,  # set True to also pass raw features to the meta-model
-    n_jobs=-1
-)
-
-model.fit(X_train, y_train)
+# Train Ridge with best alpha
+model = Ridge(alpha=best_alpha)
+model.fit(X_train_s, y_train)
 
 # Predict
-y_pred        = model.predict(X_test)
+y_pred = model.predict(X_test_s)
 y_pred_actual = np.expm1(y_pred)
 y_test_actual = np.expm1(y_test)
 
@@ -99,7 +85,8 @@ rmse = np.sqrt(mean_squared_error(y_test_actual, y_pred_actual))
 r2   = r2_score(y_test_actual, y_pred_actual)
 
 metrics_df = pd.DataFrame({
-    "model": ["Stacking (RF + XGBoost)"],
+    "model": ["Ridge Regression"],
+    "alpha": [best_alpha],
     "rmse":  [rmse],
     "r2":    [r2]
 })
@@ -115,18 +102,21 @@ plt.figure(figsize=(10, 6))
 plt.scatter(
     results_df["actual_energy_per_capita"],
     results_df["predicted_energy_per_capita"],
-    alpha=0.4, s=40, color='steelblue'
+    alpha=0.4,
+    s=40,
+    color='steelblue'
 )
 sns.regplot(
     x="actual_energy_per_capita",
     y="predicted_energy_per_capita",
     data=results_df,
     scatter=False,
+    color="black",
     line_kws={"linewidth": 2, "linestyle": "--"}
 )
 plt.xlabel("Actual Energy per Capita")
 plt.ylabel("Predicted Energy per Capita")
-plt.title("Actual vs Predicted Energy per Capita (Stacking: RF + XGBoost)")
+plt.title(f"Actual vs Predicted Energy per Capita (Ridge Regression, α={best_alpha:.2f})")
 plt.tight_layout()
 plt.savefig(os.path.join(FIG_PATH, f"{MODEL_NAME}_actual_vs_pred.png"))
 plt.close()
@@ -139,12 +129,14 @@ plt.figure(figsize=(10, 6))
 plt.scatter(
     results_df["predicted_energy_per_capita"],
     results_df["residuals"],
-    alpha=0.4, s=40, color='tomato'
+    alpha=0.4,
+    s=40,
+    color='tomato'
 )
-plt.axhline(0, linestyle='--', linewidth=2)
+plt.axhline(0, color='black', linestyle='--', linewidth=2)
 plt.xlabel("Predicted Energy per Capita")
 plt.ylabel("Residuals")
-plt.title("Residuals vs Predicted (Stacking: RF + XGBoost)")
+plt.title("Residuals vs Predicted (Ridge Regression)")
 plt.tight_layout()
 plt.savefig(os.path.join(FIG_PATH, f"{MODEL_NAME}_residuals.png"))
 plt.close()
