@@ -1,20 +1,19 @@
 """
-Stacking models RF and XGBoost 
+Train, evaluate, and plot Stacking Ensemble (Random Forest + XGBoost) on energy dataset
 - Same time-based split
 - Same features
+- Meta-model: Ridge regression meta-learner trained on out-of-fold predictions (cv=5)
 - Same evaluation + plots
-- Aggregate model: Ridge Regression trained on out-of-fold predictions (cv=5)
 """
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import os
 from sklearn.ensemble import RandomForestRegressor, StackingRegressor
-from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_squared_error, r2_score
 from xgboost import XGBRegressor
 import seaborn as sns
-from sklearn.linear_model import RidgeCV
+from sklearn.linear_model import Ridge
 
 # Paths and config
 DATA_PATH = "Data/owid-energy-data-clean.csv"
@@ -66,13 +65,13 @@ base_models = [
     )),
 ]
 
-# Aggregate model: Ridge trained on out-of-fold base model predictions
-# Out-of-fold predictions train model with data split into 5 chunks with 5 iterations
-aggregate_model = Ridge(alpha=10.0)
+# Meta-model: Ridge regression meta-learner trained on out-of-fold predictions (cv=5)
+# cv=5 generates out-of-fold predictions used to train the meta-model
+meta_model = Ridge(alpha=10.0)
 
 model = StackingRegressor(
     estimators=base_models,
-    final_estimator=aggregate_model,
+    final_estimator=meta_model,
     cv=5,
     passthrough=False,
     n_jobs=-1
@@ -81,7 +80,7 @@ model = StackingRegressor(
 model.fit(X_train, y_train)
 
 # Predict
-y_pred        = model.predict(X_test)
+y_pred = model.predict(X_test)
 y_pred_actual = np.expm1(y_pred)
 y_test_actual = np.expm1(y_test)
 
@@ -97,12 +96,12 @@ results_df.to_csv(results_file, index=False)
 
 # Evaluate
 rmse = np.sqrt(mean_squared_error(y_test_actual, y_pred_actual))
-r2   = r2_score(y_test_actual, y_pred_actual)
+r2 = r2_score(y_test_actual, y_pred_actual)
 
 metrics_df = pd.DataFrame({
     "model": ["Stacking (RF + XGBoost)"],
-    "rmse":  [rmse],
-    "r2":    [r2]
+    "rmse": [rmse],
+    "r2": [r2]
 })
 
 metrics_file = os.path.join(OUTPUT_PATH, f"{MODEL_NAME}_metrics.csv")
