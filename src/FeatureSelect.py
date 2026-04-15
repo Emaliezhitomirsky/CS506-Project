@@ -1,12 +1,10 @@
 """
 Feature selection and basic preprocessing
-
 Goal:
 - Select relevant features for predicting energy_per_capita.
 - Filter dataset by year and countries with sufficient data.
 - Drop rows with missing target.
 """
-
 import pandas as pd
 import numpy as np
 
@@ -22,19 +20,18 @@ selected_columns = [
     "nuclear_share_energy",
     "energy_per_capita"  # target
 ]
-
 df_selected = df[selected_columns].copy()
-
 df_selected['gdp_per_capita'] = df_selected['gdp'] / df_selected['population']
 df_selected.drop(columns=['gdp'], inplace=True)
 
-# These columns aren't linearly distributed, so we apply log transformation to make them linear
+# These columns aren't linearly distributed, so we also add log-transformed versions.
+# Both raw and log versions are kept for flexibility in modelling.
 skewed_cols = ["gdp_per_capita", "population"]
 for col in skewed_cols:
     df_selected[f"log_{col}"] = np.log1p(df_selected[col])
-    df_selected.drop(columns=[col], inplace=True)
+# raw gdp_per_capita and population are retained as-is
 
-#  Filter by Year and Country
+# Filter by Year and Country
 df_selected = df_selected[df_selected["year"] >= 1965]
 
 # Drop aggregates. Non-aggregate entries have 3-letter ISO codes
@@ -52,8 +49,7 @@ df_selected = df_selected.dropna(subset=['energy_per_capita']).copy()
 # Save cleaned dataset
 output_file = "Data/owid-energy-data-selected.csv"
 df_selected.to_csv(output_file, index=False)
-
 print(f"Cleaned dataset saved: {output_file}")
 print(f"Shape after filtering: {df_selected.shape}")
 print(f"Remaining countries: {df_selected['country'].nunique()}")
-print(f"Missing values: {df_selected.isna().mean().sort_values(ascending=False)}")
+print(f"Missing values:\n{df_selected.isna().mean().sort_values(ascending=False)}")
