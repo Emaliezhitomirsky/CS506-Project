@@ -13,6 +13,7 @@ from sklearn.linear_model import Ridge, RidgeCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, r2_score
 import seaborn as sns
+from sklearn.model_selection import TimeSeriesSplit
 
 # Paths and config
 DATA_PATH = "Data/owid-energy-data-clean.csv"
@@ -56,7 +57,8 @@ X_test_s  = scaler.transform(X_test)
 
 # Select best alpha via 5-fold cross-validation on the training set
 alphas = np.logspace(-3, 5, 200)
-ridge_cv = RidgeCV(alphas=alphas, cv=5)
+tscv = TimeSeriesSplit(n_splits=5)
+ridge_cv = RidgeCV(alphas=alphas, cv=tscv)
 ridge_cv.fit(X_train_s, y_train)
 best_alpha = ridge_cv.alpha_
 print(f"Best alpha (CV): {best_alpha:.4f}")
