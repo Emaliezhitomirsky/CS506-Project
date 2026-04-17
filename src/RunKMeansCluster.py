@@ -17,7 +17,6 @@ Output:
 - figures/elbow_silhouette_plot.png
 - figures/pca_variance_explained.png
 - figures/kmeans_clusters_interactive.html  (interactive Plotly scatter)
-- figures/kmeans_clusters_pca.png           
 - results/cluster_assignments.csv
 - results/pca_components.csv
 - results/clustering_metrics.csv

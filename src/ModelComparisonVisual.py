@@ -9,10 +9,14 @@ Loads prediction CSVs from all supervised models and generates:
 
 Run AFTER all model scripts:
     python RunLinearRegression.py
+    python RunRidgeRegression.py
     python RunRandomForest.py
     python RunXGBoost.py
-    python ModelComparison.py
+    python RunSVR.py
+    python RunStackingModels.py
+    python ModelComparisonVisual.py
 """
+
 
 import pandas as pd
 import numpy as np
@@ -32,8 +36,11 @@ os.makedirs(FIG_PATH, exist_ok=True)
 # Load predictions from all models 
 model_files = {
     "Linear Regression": "linear_regression_predictions.csv",
+    "Ridge Regression": "ridge_regression_predictions.csv",
     "Random Forest": "random_forest_predictions.csv",
     "XGBoost": "xgboost_predictions.csv",
+    "SVD + SVR": "svd_svr_predictions.csv",
+    "Stacking (RF + XGB)": "stacking_predictions.csv",
 }
 
 all_predictions = []
