@@ -1,0 +1,2 @@
+model,k,silhouette_score,inertia
+KMeans,4,0.3047963319437758,135.95057973225283
