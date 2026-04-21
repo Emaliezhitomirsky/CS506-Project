@@ -96,6 +96,19 @@ X_pca = pca.fit_transform(X_scaled)
 # PC4 - Wealth vs. energy efficiency. High GDP but low energy per capita = high PC4 score
 # PC5 - General Noise?
 
+cluster_names = {
+    0: "Industrialized",
+    1: "Developing",
+    2: "Renewable Leaders",
+    3: "Petrostates",
+}
+cluster_colors = {
+    0: "#66c2a5",
+    1: "#8da0cb",
+    2: "#ffd92f",
+    3: "#fc4235",
+}
+
 # Variance explained
 cumulative_var = np.cumsum(pca.explained_variance_ratio_)
 n_components_90 = np.argmax(cumulative_var >= 0.90) + 1
@@ -178,6 +191,17 @@ for c in range(CHOSEN_K):
     print(f"  Avg GDP/Capita:      ${np.expm1(members['log_gdp_per_capita']).mean():>10,.0f}")
     print(f"  Avg Fossil %:        {members['fossil_share_energy'].mean():>10.1f}%")
     print(f"  Avg Renewables %:    {members['renewables_share_energy'].mean():>10.1f}%")
+    # --- Factor Influence Analysis (Centroids) ---
+    print("\n--- Defining Factors per Cluster (Scaled Centroids) ---")
+    centroids = km_final.cluster_centers_
+
+    # Create a DataFrame using your exact feature names and cluster names
+    centroids_df = pd.DataFrame(centroids, columns=cluster_features)
+    centroids_df.index = [cluster_names[i] for i in range(CHOSEN_K)]
+
+    # Print the rounded table
+    print(centroids_df.round(2))
+
 
 #Result Plots
 
@@ -198,18 +222,7 @@ plt.tight_layout()
 plt.savefig(os.path.join(FIG_PATH, "elbow_silhouette_plot.png"), dpi=150)
 plt.close()
 
-cluster_names = {
-    0: "Industrialized",
-    1: "Developing",
-    2: "Renewable Leaders",
-    3: "Petrostates",
-}
-cluster_colors = {
-    0: "#66c2a5",
-    1: "#8da0cb",
-    2: "#ffd92f",
-    3: "#fc4235",
-}
+
 
 # Interactive Visualization - PCA Scatter 
 plot_df = snapshot[["country", "cluster"] + cluster_features].copy()
